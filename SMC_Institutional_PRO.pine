@@ -1,0 +1,129 @@
+//@version=6
+indicator("SMC Institutional PRO X", overlay=true, max_labels_count=500, max_lines_count=500)
+
+//====================================================
+// INPUTS
+//====================================================
+groupSwing = "Swing Engine"
+
+swingLength = input.int(5, "Swing Length", minval=2, maxval=20, group=groupSwing)
+showSwingLabels = input.bool(true, "Show Swing Labels", group=groupSwing)
+showSwingMarkers = input.bool(true, "Show Swing Markers", group=groupSwing)
+
+//====================================================
+// MARKET STRUCTURE INPUTS
+//====================================================
+groupMS = "Market Structure"
+
+showStructure = input.bool(true, "Show Structure", group=groupMS)
+showStructureLines = input.bool(true, "Show Structure Lines", group=groupMS)
+
+//====================================================
+// PIVOT DETECTION
+//====================================================
+pivotHigh = ta.pivothigh(high, swingLength, swingLength)
+pivotLow  = ta.pivotlow(low, swingLength, swingLength)
+
+//====================================================
+// SWING MEMORY
+//====================================================
+var float previousHigh = na
+var float currentHigh = na
+
+var float previousLow = na
+var float currentLow = na
+
+var int previousHighBar = na
+var int currentHighBar = na
+
+var int previousLowBar = na
+var int currentLowBar = na
+
+//====================================================
+// MARKET STRUCTURE VARIABLES
+//====================================================
+var bool bullishTrend = true
+
+var bool bosBull = false
+var bool bosBear = false
+
+var bool chochBull = false
+var bool chochBear = false
+
+var bool mssBull = false
+var bool mssBear = false
+
+//====================================================
+// RESET EVERY BAR
+//====================================================
+bosBull := false
+bosBear := false
+
+chochBull := false
+chochBear := false
+
+mssBull := false
+mssBear := false
+
+//====================================================
+// SWING HIGH
+//====================================================
+if not na(pivotHigh)
+
+    previousHigh := currentHigh
+    currentHigh := pivotHigh
+
+    previousHighBar := currentHighBar
+    currentHighBar := bar_index - swingLength
+
+    string highType = na(previousHigh) ? "SH" : currentHigh > previousHigh ? "HH" : "LH"
+
+    if showSwingLabels
+        label.new(
+             currentHighBar,
+             currentHigh,
+             highType,
+             style=label.style_label_down,
+             color=color.red,
+             textcolor=color.white,
+             size=size.tiny)
+
+//====================================================
+// SWING LOW
+//====================================================
+if not na(pivotLow)
+
+    previousLow := currentLow
+    currentLow := pivotLow
+
+    previousLowBar := currentLowBar
+    currentLowBar := bar_index - swingLength
+
+    string lowType = na(previousLow) ? "SL" : currentLow > previousLow ? "HL" : "LL"
+
+    if showSwingLabels
+        label.new(
+             currentLowBar,
+             currentLow,
+             lowType,
+             style=label.style_label_up,
+             color=color.green,
+             textcolor=color.white,
+             size=size.tiny)
+
+//====================================================
+// DEBUG MARKERS
+//====================================================
+plotshape(
+     showSwingMarkers and not na(pivotHigh),
+     style=shape.triangledown,
+     location=location.abovebar,
+     color=color.red,
+     size=size.tiny)
+
+plotshape(
+     showSwingMarkers and not na(pivotLow),
+     style=shape.triangleup,
+     location=location.belowbar,
+     color=color.lime,
+     size=size.tiny)
