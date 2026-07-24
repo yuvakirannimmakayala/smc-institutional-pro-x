@@ -1,0 +1,317 @@
+//@version=6
+indicator(
+     "SMC Institutional PRO X",
+     shorttitle = "SMC PRO X",
+     overlay = true,
+     max_labels_count = 500,
+     max_lines_count = 500,
+     max_boxes_count = 500)
+
+//=========================================================
+// INPUTS
+//=========================================================
+
+groupTrend = "Trend Filters"
+
+showEMA = input.bool(true, "Show EMA", group = groupTrend)
+emaLength = input.int(50, "EMA Length", minval = 1, group = groupTrend)
+
+showVWAP = input.bool(true, "Show VWAP", group = groupTrend)
+
+groupStructure = "Market Structure"
+
+swingLength = input.int(5, "Swing Length", minval = 2, group = groupStructure)
+
+groupVolume = "Volume"
+
+volumeLength = input.int(20, "Volume SMA", group = groupVolume)
+
+groupADX = "ADX"
+
+adxLength = input.int(14, "ADX Length", group = groupADX)
+adxThreshold = input.float(28.0, "ADX Threshold", group = groupADX)
+
+groupDisplay = "Display"
+
+bullColor = input.color(color.lime, "Bullish Color", group = groupDisplay)
+bearColor = input.color(color.red, "Bearish Color", group = groupDisplay)
+showDebug = input.bool(false, "Debug Labels", group = groupDisplay)
+
+//=========================================================
+// INDICATORS
+//=========================================================
+
+ema = ta.ema(close, emaLength)
+vwap = ta.vwap(close)
+
+[diplus, diminus, adx] = ta.dmi(adxLength, adxLength)
+
+volumeMA = ta.sma(volume, volumeLength)
+
+atr = ta.atr(14)
+
+//=========================================================
+// PLOTS
+//=========================================================
+
+plot(showEMA ? ema : na, "EMA", color.blue, 2)
+
+plot(showVWAP ? vwap : na, "VWAP", color.orange, 2)
+
+//=========================================================
+// GLOBAL VARIABLES
+//=========================================================
+
+var float swingHigh = na
+var float swingLow = na
+
+var int swingHighBar = na
+var int swingLowBar = na
+
+var bool bullishTrend = false
+var bool bearishTrend = false
+
+//=========================================================
+// MARKET STRUCTURE
+//=========================================================
+
+var bool bullishBOS = false
+var bool bearishBOS = false
+
+var bool bullishCHOCH = false
+var bool bearishCHOCH = false
+
+var bool bullishMSS = false
+var bool bearishMSS = false
+
+var bool highBroken = false
+var bool lowBroken = false
+
+var int trend = 0
+// 1 = Bull
+//-1 = Bear
+// 0 = Neutral
+// UTILITY FUNCTIONS
+//=========================================================
+
+candleRange() =>
+    high - low
+
+bodySize() =>
+    math.abs(close - open)
+
+bodyPercent() =>
+    candleRange() == 0 ? 0.0 : bodySize() / candleRange()
+
+isBullish() =>
+    close > open
+
+isBearish() =>
+    close < open
+
+highVolume() =>
+    volume > volumeMA
+
+strongTrend() =>
+    adx > adxThreshold
+
+//=========================================================
+// OBJECT STORAGE
+//=========================================================
+
+var label[] smcLabels = array.new<label>()
+var line[] smcLines = array.new<line>()
+var box[] smcBoxes = array.new<box>()
+
+addLabel(label l)=>
+    array.push(smcLabels, l)
+
+addLine(line l)=>
+    array.push(smcLines, l)
+
+addBox(box b)=>
+    array.push(smcBoxes, b)
+
+//=========================================================
+// SWING ENGINE
+//=========================================================
+
+// Confirmed pivots
+pivotHigh = ta.pivothigh(high, swingLength, swingLength)
+pivotLow  = ta.pivotlow(low, swingLength, swingLength)
+
+// Previous confirmed swings
+var float previousSwingHigh = na
+var float previousSwingLow  = na
+
+var string highStructure = ""
+var string lowStructure  = ""
+
+//-----------------------------
+// SWING HIGH
+//-----------------------------
+if not na(pivotHigh)
+
+    swingHigh := pivotHigh
+    swingHighBar := bar_index - swingLength
+
+    if na(previousSwingHigh)
+        highStructure := "SH"
+    else
+        highStructure := swingHigh > previousSwingHigh ? "HH" : "LH"
+
+    previousSwingHigh := swingHigh
+    highBroken := false
+
+    lbl = label.new(
+         swingHighBar,
+         swingHigh,
+         highStructure,
+         style = label.style_label_down,
+         color = bearColor,
+         textcolor = color.white,
+         size = size.tiny)
+
+    addLabel(lbl)
+
+//-----------------------------
+// SWING LOW
+//-----------------------------
+if not na(pivotLow)
+
+    swingLow := pivotLow
+    swingLowBar := bar_index - swingLength
+
+    if na(previousSwingLow)
+        lowStructure := "SL"
+    else
+        lowStructure := swingLow > previousSwingLow ? "HL" : "LL"
+
+    previousSwingLow := swingLow
+    lowBroken := false
+
+    lbl = label.new(
+         swingLowBar,
+         swingLow,
+         lowStructure,
+         style = label.style_label_up,
+         color = bullColor,
+         textcolor = color.white,
+         size = size.tiny)
+
+    addLabel(lbl)
+//=========================================================
+// BOS ENGINE
+//=========================================================
+
+bullishBOS := false
+bearishBOS := false
+
+bullishCHOCH := false
+bearishCHOCH := false
+
+bullishMSS := false
+bearishMSS := false
+
+// Bullish BOS
+if not na(swingHigh)
+    if not highBroken and close > swingHigh
+
+        bullishBOS := true
+        highBroken := true
+        trend := 1
+
+        l = line.new(
+             swingHighBar,
+             swingHigh,
+             bar_index,
+             swingHigh,
+             color = color.lime,
+             width = 2)
+
+        addLine(l)
+
+        lb = label.new(
+             bar_index,
+             swingHigh,
+             "BOS",
+             style = label.style_label_up,
+             color = color.lime,
+             textcolor = color.black,
+             size = size.small)
+
+        addLabel(lb)
+
+// Bearish BOS
+if not na(swingLow)
+    if not lowBroken and close < swingLow
+
+        bearishBOS := true
+        lowBroken := true
+        trend := -1
+
+        l = line.new(
+             swingLowBar,
+             swingLow,
+             bar_index,
+             swingLow,
+             color = color.red,
+             width = 2)
+
+        addLine(l)
+
+        lb = label.new(
+             bar_index,
+             swingLow,
+             "BOS",
+             style = label.style_label_down,
+             color = color.red,
+             textcolor = color.white,
+             size = size.small)
+
+        addLabel(lb)
+//=========================================================
+// CHOCH RESET
+//=========================================================
+
+if bullishBOS
+    bearishCHOCH := false
+
+if bearishBOS
+    bullishCHOCH := false
+// TREND STATE
+//=========================================================
+
+if bullishBOS
+    bullishTrend := true
+    bearishTrend := false
+
+if bearishBOS
+    bullishTrend := false
+    bearishTrend := true
+
+
+// DEBUG
+//=========================================================
+
+if showDebug and barstate.islast
+
+    txt =
+         "ATR : " + str.tostring(atr) +
+         "\nADX : " + str.tostring(adx) +
+         "\nVol MA : " + str.tostring(volumeMA)
+
+    lbl = label.new(
+         bar_index,
+         high,
+         txt,
+         style=label.style_label_down,
+         color=color.gray,
+         textcolor=color.white)
+
+    addLabel(lbl)
+
+bgcolor(
+     trend == 1 ? color.new(color.green,95) :
+     trend == -1 ? color.new(color.red,95) :
+     na)
