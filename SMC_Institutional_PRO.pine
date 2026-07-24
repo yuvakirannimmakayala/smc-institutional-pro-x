@@ -126,4 +126,4 @@ plotshape(
      style=shape.triangleup,
      location=location.belowbar,
      color=color.lime,
-     size=size.tiny)
+     size=size.tiny)   
